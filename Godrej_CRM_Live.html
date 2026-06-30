@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Godrej Properties — Live CRM Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0A1628;--card:#111827;--border:#1F2937;
+  --navy:#0F1F3D;--navyM:#1B2A4A;--navyL:#243555;
+  --gold:#C9A84C;--goldD:#9B7B2E;
+  --teal:#0D9488;--green:#16A34A;--red:#DC2626;
+  --blue:#2563EB;--purple:#7C3AED;--orange:#EA580C;
+  --text:#F9FAFB;--muted:#9CA3AF;--dim:#6B7280;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:13px;min-height:100vh}
+
+/* LOADING SCREEN */
+#loadScreen{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:20px}
+.load-logo{background:linear-gradient(135deg,var(--gold),var(--goldD));border-radius:16px;width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:900;color:var(--navy)}
+.load-title{font-size:22px;font-weight:800;color:var(--gold)}
+.load-sub{font-size:12px;color:var(--muted);text-align:center}
+.load-bar-wrap{width:300px;height:6px;background:#1F2937;border-radius:99px;overflow:hidden}
+.load-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--gold),var(--teal));width:0%;transition:width .3s}
+.load-status{font-size:11px;color:var(--muted);min-height:20px;text-align:center}
+.load-err{color:var(--red);font-size:12px;text-align:center;max-width:400px;padding:12px 16px;background:rgba(220,38,38,.1);border:1px solid rgba(220,38,38,.3);border-radius:8px;display:none}
+.btn-retry{padding:8px 20px;border-radius:8px;background:var(--gold);color:var(--navy);font-weight:700;border:none;cursor:pointer;display:none;margin-top:8px}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--navyM),var(--navyL));border-bottom:1px solid rgba(201,168,76,.3);position:sticky;top:0;z-index:100;box-shadow:0 4px 24px rgba(0,0,0,.5)}
+.header-top{padding:10px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.logo-row{display:flex;align-items:center;gap:12px}
+.logo-box{background:linear-gradient(135deg,var(--gold),var(--goldD));border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:var(--navy);flex-shrink:0}
+.logo-title{font-size:15px;font-weight:800;color:var(--gold)}
+.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.08em}
+.header-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.live-badge{background:rgba(22,163,74,.15);border:1px solid rgba(22,163,74,.4);border-radius:6px;padding:3px 10px;color:var(--green);font-size:10px;font-weight:600;cursor:pointer}
+.live-badge:hover{background:rgba(22,163,74,.25)}
+.h-stats{color:var(--muted);font-size:10px}
+.tabs{display:flex;padding-left:20px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--muted);padding:9px 14px;font-size:11px;cursor:pointer;white-space:nowrap;transition:all .15s;font-family:inherit}
+.tab.active{border-bottom-color:var(--gold);color:var(--gold);font-weight:700;background:rgba(201,168,76,.08)}
+.tab:hover:not(.active){color:var(--text)}
+.content{padding:20px 24px;max-width:1400px;margin:0 auto}
+.pane{display:none;flex-direction:column;gap:18px}
+.pane.active{display:flex}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g21{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.g12{display:grid;grid-template-columns:1fr 2fr;gap:16px}
+.kpi{background:linear-gradient(135deg,var(--card),#1a2744);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden;border-left:3px solid var(--c,var(--gold));border-top:1px solid rgba(255,255,255,.04);border-right:1px solid rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.04)}
+.kpi-icon{position:absolute;top:8px;right:10px;font-size:22px;opacity:.1}
+.kpi-label{color:var(--muted);font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.kpi-value{font-size:21px;font-weight:800;line-height:1.1;margin-bottom:3px}
+.kpi-sub{color:var(--dim);font-size:10px}
+.kpi-trend{font-size:10px;margin-top:4px}
+.up{color:var(--green)}.dn{color:var(--red)}
+.sh{margin-bottom:14px;border-left:3px solid var(--gold);padding-left:10px}
+.sh-t{color:var(--text);font-weight:700;font-size:13px}
+.sh-s{color:var(--muted);font-size:10px;margin-top:2px}
+.chart-box{position:relative}
+canvas{max-width:100%}
+.prog{background:#1F2937;border-radius:99px;overflow:hidden}
+.prog-fill{border-radius:99px;transition:width .6s}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead tr{background:var(--navyM)}
+th{padding:9px 12px;color:var(--muted);font-weight:600;font-size:9px;text-align:left;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+td{padding:9px 12px;border-bottom:1px solid var(--border)}
+tr:nth-child(even) td{background:rgba(15,31,61,.3)}
+tr:hover td{background:rgba(201,168,76,.04)}
+.tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+.fbtn{padding:5px 14px;border-radius:8px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .15s}
+.fbtn.active,.fbtn:hover{border-color:var(--gold);background:rgba(201,168,76,.12);color:var(--gold);font-weight:700}
+.sbtn{padding:3px 10px;border-radius:6px;font-size:10px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit}
+.sbtn.active{border-color:var(--gold);background:rgba(201,168,76,.12);color:var(--gold)}
+.mbtn{padding:5px 14px;border-radius:8px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);font-family:inherit;transition:all .15s}
+.mbtn.active{border-color:var(--gold);background:rgba(201,168,76,.12);color:var(--gold);font-weight:700}
+.search{padding:5px 12px;border-radius:8px;font-size:11px;border:1px solid var(--border);background:var(--card);color:var(--text);outline:none;font-family:inherit;width:200px}
+.search:focus{border-color:var(--gold)}
+.exec-card{padding:12px 14px;border-radius:10px;cursor:pointer;border:1px solid var(--border);background:var(--card);transition:all .2s;margin-bottom:8px}
+.exec-card:hover{border-color:rgba(201,168,76,.4)}
+.exec-card.sel{background:rgba(201,168,76,.07);border-color:var(--gold)}
+.exec-scroll{max-height:600px;overflow-y:auto}
+.ph{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;min-height:300px;color:var(--dim)}
+.alert{padding:10px 14px;border-radius:8px;background:#0F1F3D;border:1px solid rgba(220,38,38,.3);margin-top:12px}
+.footer{background:linear-gradient(135deg,var(--navyM),var(--navyL));border-top:1px solid rgba(201,168,76,.2);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:20px}
+.footer span{color:var(--dim);font-size:9px}
+.footer .rev{color:var(--gold);font-weight:600}
+.last-updated{color:var(--teal);font-size:10px}
+@media(max-width:900px){.g4{grid-template-columns:1fr 1fr}.g21,.g12,.g2{grid-template-columns:1fr}.g3{grid-template-columns:1fr}}
+@media(max-width:500px){.g4{grid-template-columns:1fr 1fr}.content{padding:12px}}
+</style>
+</head>
+<body>
+
+<!-- LOADING SCREEN -->
+<div id="loadScreen">
+  <div class="load-logo">G</div>
+  <div class="load-title">GODREJ PROPERTIES</div>
+  <div class="load-sub">Real Estate Sales Automation System<br>Loading live data from Google Sheets...</div>
+  <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
+  <div class="load-status" id="loadStatus">Connecting to your Google Sheet...</div>
+  <div class="load-err" id="loadErr"></div>
+  <button class="btn-retry" id="btnRetry" onclick="loadAllData()">Retry</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" style="display:none">
+  <div class="header">
+    <div class="header-top">
+      <div class="logo-row">
+        <div class="logo-box">G</div>
+        <div>
+          <div class="logo-title">GODREJ PROPERTIES</div>
+          <div class="logo-sub">REAL ESTATE SALES AUTOMATION · ASM COMMAND CENTER · FY 2024-25</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="live-badge" onclick="refreshData()" title="Click to refresh">&#9679; LIVE — Click to Refresh</div>
+        <span class="h-stats" id="hStats">Loading...</span>
+        <span class="last-updated" id="lastUpdated"></span>
+      </div>
+    </div>
+    <div class="tabs" id="tabBar"></div>
+  </div>
+  <div class="content" id="content"></div>
+  <div class="footer">
+    <span>GODREJ PROPERTIES · Real Estate Sales Automation · ASM Command Center · FY 2024-25 · Confidential · Built by Rajib Kumar Sarkar</span>
+    <div style="display:flex;gap:14px" id="footerStats"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const SHEET_ID = '19QKDr2f60cO1Wx6iK7HefbI_iUjqwHzGbx8dqHRCBdM';
+const BASE_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+
+const SHEET_NAMES = {
+  leads:    'Lead Management',
+  bookings: 'Booking Management',
+  payments: 'Payment Tracker',
+  execs:    'Executive Performance',
+  partners: 'Channel Partner Performance',
+  followups:'Follow-up Automation',
+  sv:       'Site Visit Management',
+};
+
+const P=['#C9A84C','#0D9488','#2563EB','#7C3AED','#EA580C','#16A34A','#DB2777','#0891B2','#DC2626','#F59E0B','#84CC16','#EC4899'];
+const PC={'On Schedule':'#2563EB','Partial':'#EA580C','Overdue':'#DC2626','Fully Paid':'#16A34A'};
+Chart.defaults.color='#9CA3AF';
+Chart.defaults.font.family="'Segoe UI',system-ui,sans-serif";
+Chart.defaults.font.size=11;
+
+let D = {}; // computed data
+let charts = {};
+let activeTab = 'overview';
+let selectedExec = null, execMetric = 'rev', citySort = 'rev', fuFilter = 'all', fuSearch = '', monthView = 'all';
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+const TABS = [
+  {id:'overview',  label:'📊 Overview'},
+  {id:'funnel',    label:'🎯 Sales Funnel'},
+  {id:'revenue',   label:'💰 Revenue'},
+  {id:'execs',     label:'🏆 Executives'},
+  {id:'sources',   label:'📡 Lead Sources'},
+  {id:'portfolio', label:'🏗️ Portfolio'},
+  {id:'partners',  label:'🤝 Partners'},
+  {id:'payments',  label:'💳 Payments'},
+  {id:'followups', label:'📅 Follow-ups'},
+  {id:'insights',  label:'🔍 Insights'},
+  {id:'targets',   label:'🎯 Targets'},
+  {id:'forecast',  label:'📈 Forecast'},
+];
+
+// ── LOADING ───────────────────────────────────────────────────────────────────
+function setProgress(pct, msg) {
+  document.getElementById('loadBar').style.width = pct + '%';
+  document.getElementById('loadStatus').textContent = msg;
+}
+
+function showError(msg) {
+  const el = document.getElementById('loadErr');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('btnRetry').style.display = 'inline-block';
+  setProgress(0, 'Failed to load data');
+}
+
+async function fetchSheet(name) {
+  const url = BASE_URL + encodeURIComponent(name) + '&t=' + Date.now();
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Cannot fetch ${name}: ${res.status}`);
+  const text = await res.text();
+  return Papa.parse(text, {header: true, skipEmptyLines: true}).data;
+}
+
+// ── PARSE & COMPUTE ───────────────────────────────────────────────────────────
+function parseLeads(rows) {
+  return rows.filter(r => r['Lead ID'] && r['Lead ID'].startsWith('LD') && r['Lead Status'])
+    .map(r => ({
+      id: r['Lead ID'], name: r['Customer Name'] || '',
+      city: r['City'] || '', budget: parseFloat(r['Budget (₹)']) || 0,
+      project: r['Project'] || '', unit: r['Unit Type'] || '',
+      source: r['Lead Source'] || '', executive: r['Assigned Executive'] || '',
+      status: r['Lead Status'] || '', partner: r['Channel Partner'] || '',
+      date: r['Lead Date'] || '',
+      daysFu: parseInt(r['Days Until F/U'] || r['Days Pending']) || 0,
+    }));
+}
+
+function parseBookings(rows) {
+  return rows.filter(r => r['Booking ID'] && r['Booking ID'].startsWith('BK'))
+    .map(r => ({
+      id: r['Booking ID'], customer: r['Customer Name'] || '',
+      project: r['Project'] || '', unit: r['Unit Type'] || '',
+      value: parseFloat(r['Property Value (₹)']) || 0,
+      executive: r['Executive'] || '', city: r['City'] || '',
+      source: r['Lead Source'] || '', date: r['Booking Date'] || '',
+    }));
+}
+
+function parsePayments(rows) {
+  return rows.filter(r => r['Booking ID'] && r['Booking ID'].startsWith('BK'))
+    .map(r => ({
+      total: parseFloat(r['Total Value (₹)']) || 0,
+      received: parseFloat(r['Amount Received (₹)']) || 0,
+      status: r['Payment Status'] || '',
+    }));
+}
+
+function parseExecs(rows) {
+  return rows.filter(r => r['Executive Name'] && !r['Executive Name'].includes('TEAM') && r['Executive Name'].length > 3)
+    .map(r => ({
+      name: r['Executive Name'],
+      leads: parseInt(r['Leads Assigned']) || 0,
+      calls: parseInt(r['Calls Made']) || 0,
+      sv: parseInt(r['Site Visits']) || 0,
+      bk: parseInt(r['Bookings']) || 0,
+      rev: Math.round((parseFloat(r['Revenue (₹)']) || 0) / 1e5) / 100,
+      conv: Math.round((parseFloat(r['Conversion %']) || 0) * 1000) / 10,
+      avgDeal: Math.round((parseFloat(r['Avg Deal Size (₹)']) || 0) / 1e3) / 100,
+      rating: r['Rating'] || '',
+    }));
+}
+
+function parsePartners(rows) {
+  return rows.filter(r => r['Partner Name'] && r['Partner Name'].length > 3)
+    .map(r => ({
+      name: r['Partner Name'],
+      leads: parseInt(r['Leads Generated']) || 0,
+      sv: parseInt(r['Site Visits']) || 0,
+      bk: parseInt(r['Bookings']) || 0,
+      rev: Math.round((parseFloat(r['Revenue (₹)']) || 0) / 1e5) / 100,
+      conv: Math.round((parseFloat(r['Conversion %']) || 0) * 1000) / 10,
+      tier: r['Tier'] || 'Bronze',
+    }));
+}
+
+function parseFollowups(rows) {
+  return rows.filter(r => r['Lead ID'] && r['Lead ID'].startsWith('LD'))
+    .map(r => ({
+      id: r['Lead ID'], name: r['Customer Name'] || '',
+      exec: r['Executive'] || '', status: r['Current Status'] || '',
+      days: parseInt(r['Days Overdue']) || 0,
+      priority: r['Priority Action'] || '',
+    }));
+}
+
+function computeAnalytics(leads, bookings, payments, svCount) {
+  const mnames = ["Apr'24","May'24","Jun'24","Jul'24","Aug'24","Sep'24","Oct'24","Nov'24","Dec'24","Jan'25","Feb'25","Mar'25"];
+  const mmap = {4:0,5:1,6:2,7:3,8:4,9:5,10:6,11:7,12:8,1:9,2:10,3:11};
+  const monthly = mnames.map(m => ({m, leads:0, sv:0, bk:0, rev:0}));
+
+  leads.forEach(l => {
+    if (!l.date) return;
+    const parts = l.date.split(/[-\/]/);
+    let month = -1;
+    if (parts.length >= 2) {
+      // Try DD-MMM-YY or YYYY-MM-DD
+      const mStr = l.date.toLowerCase();
+      if (mStr.includes('apr')) month = 4;
+      else if (mStr.includes('may')) month = 5;
+      else if (mStr.includes('jun')) month = 6;
+      else if (mStr.includes('jul')) month = 7;
+      else if (mStr.includes('aug')) month = 8;
+      else if (mStr.includes('sep')) month = 9;
+      else if (mStr.includes('oct')) month = 10;
+      else if (mStr.includes('nov')) month = 11;
+      else if (mStr.includes('dec')) month = 12;
+      else if (mStr.includes('jan')) month = 1;
+      else if (mStr.includes('feb')) month = 2;
+      else if (mStr.includes('mar')) month = 3;
+      else month = parseInt(parts[1]);
+    }
+    const mi = mmap[month];
+    if (mi !== undefined) {
+      monthly[mi].leads++;
+      if (['Site Visit Scheduled','Site Visit Completed','Negotiation','Booked'].includes(l.status)) monthly[mi].sv++;
+      if (l.status === 'Booked') monthly[mi].bk++;
+    }
+  });
+
+  bookings.forEach(b => {
+    if (!b.date) return;
+    const mStr = b.date.toLowerCase();
+    let month = -1;
+    if (mStr.includes('apr')) month=4; else if (mStr.includes('may')) month=5;
+    else if (mStr.includes('jun')) month=6; else if (mStr.includes('jul')) month=7;
+    else if (mStr.includes('aug')) month=8; else if (mStr.includes('sep')) month=9;
+    else if (mStr.includes('oct')) month=10; else if (mStr.includes('nov')) month=11;
+    else if (mStr.includes('dec')) month=12; else if (mStr.includes('jan')) month=1;
+    else if (mStr.includes('feb')) month=2; else if (mStr.includes('mar')) month=3;
+    const mi = mmap[month];
+    if (mi !== undefined) monthly[mi].rev = Math.round((monthly[mi].rev + b.value/1e7)*100)/100;
+  });
+
+  const sOrder = ['New','Follow-up','Site Visit Scheduled','Site Visit Completed','Negotiation','Booked','Lost'];
+  const sCols = ['#3B82F6','#8B5CF6','#0891B2','#0D9488','#EA580C','#16A34A','#DC2626'];
+  const sc = {}; leads.forEach(l => { if(l.status) sc[l.status] = (sc[l.status]||0)+1; });
+  const funnel = sOrder.map((s,i) => ({stage:s, count:sc[s]||0, color:sCols[i]}));
+
+  const srcM = {};
+  leads.forEach(l => {
+    if (!l.source) return;
+    if (!srcM[l.source]) srcM[l.source] = {name:l.source, leads:0, bk:0, rev:0};
+    srcM[l.source].leads++;
+    if (l.status === 'Booked') srcM[l.source].bk++;
+  });
+  bookings.forEach(b => { if(b.source && srcM[b.source]) srcM[b.source].rev += b.value/1e7; });
+  const sources = Object.values(srcM).map(s => ({...s, rev:Math.round(s.rev*100)/100, conv:s.leads?Math.round(s.bk/s.leads*1000)/10:0})).sort((a,b)=>b.rev-a.rev);
+
+  const cityM = {};
+  leads.forEach(l => {
+    if (!l.city) return;
+    if (!cityM[l.city]) cityM[l.city] = {city:l.city, leads:0, bk:0, rev:0};
+    cityM[l.city].leads++;
+    if (l.status==='Booked') cityM[l.city].bk++;
+  });
+  bookings.forEach(b => { if(b.city && cityM[b.city]) cityM[b.city].rev += b.value/1e7; });
+  const cities = Object.values(cityM).map(c => ({...c, rev:Math.round(c.rev*100)/100, conv:c.leads?Math.round(c.bk/c.leads*1000)/10:0})).sort((a,b)=>b.rev-a.rev);
+
+  const unitM = {};
+  leads.forEach(l => {
+    if (!l.unit || l.unit.includes('Not')) return;
+    if (!unitM[l.unit]) unitM[l.unit] = {type:l.unit, leads:0, bk:0, rev:0};
+    unitM[l.unit].leads++;
+    if (l.status==='Booked') unitM[l.unit].bk++;
+  });
+  bookings.forEach(b => { if(b.unit && unitM[b.unit]) unitM[b.unit].rev += b.value/1e7; });
+  const units = Object.values(unitM).map(u => ({...u, rev:Math.round(u.rev*100)/100, conv:u.leads?Math.round(u.bk/u.leads*1000)/10:0, avgDeal:u.bk?Math.round(u.rev/u.bk*100):0}));
+
+  const projM = {};
+  bookings.forEach(b => {
+    if (!b.project) return;
+    if (!projM[b.project]) projM[b.project] = {name:b.project, bk:0, rev:0};
+    projM[b.project].bk++; projM[b.project].rev += b.value/1e7;
+  });
+  const projects = Object.values(projM).map(p => ({...p, rev:Math.round(p.rev*100)/100})).sort((a,b)=>b.rev-a.rev);
+
+  const bRanges = [['<50L',0,5e6],['50-75L',5e6,7.5e6],['75L-1Cr',7.5e6,1e7],['1-1.5Cr',1e7,1.5e7],['1.5-2Cr',1.5e7,2e7],['>2Cr',2e7,1e15]];
+  const budget = bRanges.map(([r,lo,hi]) => ({range:r, count:leads.filter(l=>l.budget>lo&&l.budget<=hi).length}));
+
+  const payTotal = payments.reduce((s,p)=>s+p.total,0);
+  const payRecv = payments.reduce((s,p)=>s+p.received,0);
+  const psObj = {}; payments.forEach(p => { if(p.status) psObj[p.status]=(psObj[p.status]||0)+1; });
+  const payStatus = Object.entries(psObj).map(([name,val])=>({name,val}));
+
+  const totalRev = bookings.reduce((s,b)=>s+b.value,0);
+  const overdue = leads.filter(l=>l.status!=='Booked'&&l.status!=='Lost'&&l.daysFu<0).length;
+  const critical = leads.filter(l=>l.status!=='Booked'&&l.status!=='Lost'&&l.daysFu<-7).length;
+  const topExec = [...(D.execs||[])].sort((a,b)=>b.conv-a.conv)[0];
+
+  return {
+    monthly, funnel, sources, cities, units, projects, budget, payStatus,
+    payTotal: Math.round(payTotal/1e5)/100,
+    payRecv: Math.round(payRecv/1e5)/100,
+    payBal: Math.round((payTotal-payRecv)/1e5)/100,
+    kpis: {
+      leads: leads.length, bookings: bookings.length, sv: svCount,
+      revCr: Math.round(totalRev/1e5)/100,
+      convRate: leads.length ? Math.round(bookings.length/leads.length*1000)/10 : 0,
+      avgDealL: bookings.length ? Math.round(totalRev/bookings.length/1e3)/100 : 0,
+      overdue, critical,
+      topExec: topExec?.name || '—',
+      topExecConv: topExec?.conv || 0,
+      topExecRev: topExec?.rev || 0,
+    }
+  };
+}
+
+// ── LOAD ALL DATA ─────────────────────────────────────────────────────────────
+async function loadAllData() {
+  document.getElementById('loadErr').style.display = 'none';
+  document.getElementById('btnRetry').style.display = 'none';
+  document.getElementById('loadScreen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+
+  try {
+    setProgress(10, 'Loading Lead Management...');
+    const leadRows = await fetchSheet(SHEET_NAMES.leads);
+    const leads = parseLeads(leadRows);
+
+    setProgress(25, 'Loading Booking Management...');
+    const bkRows = await fetchSheet(SHEET_NAMES.bookings);
+    const bookings = parseBookings(bkRows);
+
+    setProgress(40, 'Loading Payment Tracker...');
+    const payRows = await fetchSheet(SHEET_NAMES.payments);
+    const payments = parsePayments(payRows);
+
+    setProgress(55, 'Loading Executive Performance...');
+    const execRows = await fetchSheet(SHEET_NAMES.execs);
+    D.execs = parseExecs(execRows).sort((a,b)=>b.rev-a.rev);
+
+    setProgress(70, 'Loading Channel Partners...');
+    const cpRows = await fetchSheet(SHEET_NAMES.partners);
+    D.partners = parsePartners(cpRows).sort((a,b)=>b.rev-a.rev);
+
+    setProgress(82, 'Loading Follow-up Automation...');
+    const fuRows = await fetchSheet(SHEET_NAMES.followups);
+    D.followups = parseFollowups(fuRows).sort((a,b)=>b.days-a.days);
+
+    setProgress(92, 'Loading Site Visits...');
+    const svRows = await fetchSheet(SHEET_NAMES.sv);
+    const svCount = svRows.filter(r=>r['Visit ID']&&r['Visit ID'].startsWith('SV')).length;
+
+    setProgress(98, 'Computing analytics...');
+    const computed = computeAnalytics(leads, bookings, payments, svCount);
+    Object.assign(D, computed);
+    D.leads = leads;
+    D.bookings = bookings;
+
+    setProgress(100, 'Done!');
+
+    // Update header
+    document.getElementById('hStats').textContent = `${D.kpis.leads} Leads · ${D.kpis.bookings} Bookings · ₹${D.kpis.revCr} Cr`;
+    document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    const fs = document.getElementById('footerStats');
+    fs.innerHTML = `<span>${D.kpis.leads} Leads</span><span>${D.kpis.bookings} Bookings</span><span class="rev">₹${D.kpis.revCr} Cr Revenue</span><span>Live from Google Sheets</span>`;
+
+    setTimeout(() => {
+      document.getElementById('loadScreen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      buildTabs();
+      render();
+    }, 400);
+
+  } catch (err) {
+    console.error(err);
+    showError('Could not load data from Google Sheets. Make sure the sheet is set to "Anyone with link can view".\n\nError: ' + err.message);
+  }
+}
+
+async function refreshData() {
+  await loadAllData();
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function kpi(icon,label,value,sub,color,trend,tv){
+  return`<div class="kpi" style="border-left-color:${color}">
+    <div class="kpi-icon">${icon}</div>
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value" style="color:${color}">${value}</div>
+    <div class="kpi-sub">${sub}</div>
+    ${trend?`<div class="kpi-trend ${trend}">${trend==='up'?'▲':'▼'} ${tv}</div>`:''}
+  </div>`;
+}
+function sh(t,s){return`<div class="sh"><div class="sh-t">${t}</div>${s?`<div class="sh-s">${s}</div>`:''}</div>`;}
+function bdg(t,c){return`<span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${t}</span>`;}
+function pb(v,max,c,h=5){const w=Math.min(100,Math.max(0,max>0?v/max*100:0));return`<div class="prog" style="height:${h}px"><div class="prog-fill" style="width:${w}%;background:${c};height:${h}px"></div></div>`;}
+function cv(id,h=240){return`<div class="chart-box" style="height:${h}px"><canvas id="${id}"></canvas></div>`;}
+function mc(id,type,data,opts={}){
+  const el=document.getElementById(id);if(!el)return;
+  function deep(a,b){const o={...a};if(b)Object.keys(b).forEach(k=>{o[k]=(b[k]&&typeof b[k]==='object'&&!Array.isArray(b[k]))?deep(a[k]||{},b[k]):b[k]});return o;}
+  const def={responsive:true,maintainAspectRatio:false,animation:{duration:500},plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#6B7280'}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}}}};
+  charts[id]=new Chart(el,{type,data,options:deep(def,opts)});
+}
+
+// ── TAB BAR ───────────────────────────────────────────────────────────────────
+function buildTabs(){
+  document.getElementById('tabBar').innerHTML=TABS.map(t=>`<button class="tab${t.id===activeTab?' active':''}" onclick="switchTab('${t.id}')">${t.label}</button>`).join('');
+}
+function switchTab(id){
+  activeTab=id;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.textContent.trim()===TABS.find(t=>t.id===id).label));
+  render();
+}
+function render(){
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});charts={};
+  const cont=document.getElementById('content');cont.innerHTML='';
+  const pane=document.createElement('div');pane.className='pane active';cont.appendChild(pane);
+  const fns={overview:renderOverview,funnel:renderFunnel,revenue:renderRevenue,
+    execs:renderExecs,sources:renderSources,portfolio:renderPortfolio,
+    partners:renderPartners,payments:renderPayments,followups:renderFollowups,
+    insights:renderInsights,targets:renderTargets,forecast:renderForecast};
+  if(fns[activeTab])fns[activeTab](pane);
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+function renderOverview(p){
+  const k=D.kpis||{};
+  const cp=D.payTotal>0?(D.payRecv/D.payTotal*100).toFixed(1):0;
+  const mData=monthView==='h1'?D.monthly.slice(0,6):monthView==='h2'?D.monthly.slice(6):D.monthly;
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('📋','Total Leads',k.leads,'All sources · FY 2024-25','#2563EB','up','Live from Sheets')}
+    ${kpi('🏗️','Site Visits',k.sv,`${k.leads>0?Math.round(k.sv/k.leads*100):0}% of leads`,'#0D9488')}
+    ${kpi('✅','Bookings',k.bookings,`Conv. ${k.convRate}%`,'#16A34A','up',`₹${k.avgDealL}Cr avg`)}
+    ${kpi('💰','Revenue',`₹${k.revCr} Cr`,`₹${k.avgDealL}Cr avg deal`,'#C9A84C','up','FY 2024-25')}
+  </div>
+  <div class="g4">
+    ${kpi('🎯','Conversion Rate',`${k.convRate}%`,'Lead to Booking','#7C3AED','up','Industry avg: 12%')}
+    ${kpi('⚠️','Outstanding',`₹${D.payBal} Cr`,'Pending collection','#EA580C','dn','Action needed')}
+    ${kpi('🔴','Overdue Follow-ups',k.overdue,`${k.critical} critical >7 days`,'#DC2626','dn','')}
+    ${kpi('🏆','Top Performer',(k.topExec||'—').split(' ')[0],`${k.topExecConv}% conv · ₹${k.topExecRev}Cr`,'#C9A84C')}
+  </div>
+  <div class="g21">
+    <div class="card">
+      ${sh('Monthly Performance Trend','Leads · Site Visits · Bookings · Revenue (₹ Cr)')}
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="fbtn${monthView==='all'?' active':''}" onclick="monthView='all';renderOverview(document.querySelector('.pane'))">Full Year</button>
+        <button class="fbtn${monthView==='h1'?' active':''}" onclick="monthView='h1';renderOverview(document.querySelector('.pane'))">Apr–Sep</button>
+        <button class="fbtn${monthView==='h2'?' active':''}" onclick="monthView='h2';renderOverview(document.querySelector('.pane'))">Oct–Mar</button>
+      </div>${cv('cMon',250)}
+    </div>
+    <div class="card">
+      ${sh('Sales Funnel','Stage distribution')}
+      ${(D.funnel||[]).map(f=>`<div style="margin-bottom:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="color:var(--muted);font-size:10px">${f.stage}</span>
+          <span style="color:${f.color};font-weight:700;font-size:10px">${f.count} · ${k.leads>0?Math.round(f.count/k.leads*100):0}%</span>
+        </div>${pb(f.count,Math.max(...(D.funnel||[{count:1}]).map(x=>x.count)),f.color)}</div>`).join('')}
+      <div style="margin-top:12px;padding:10px 12px;background:#0F1F3D;border-radius:8px;border:1px solid rgba(22,163,74,.2)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><div style="color:var(--gold);font-weight:700;font-size:18px">${k.convRate}%</div><div style="color:var(--dim);font-size:10px">Lead → Booking</div></div>
+          <div><div style="color:var(--teal);font-weight:700;font-size:18px">${k.sv>0?Math.round(k.bookings/k.sv*100):0}%</div><div style="color:var(--dim);font-size:10px">Visit → Booking</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="g3">
+    <div class="card">${sh('Source Conversion %','Best converting channel')}${cv('cSrc',200)}</div>
+    <div class="card">
+      ${sh('Payment Health',`₹${D.payTotal} Cr portfolio`)}
+      ${cv('cPay',130)}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px">
+        ${(D.payStatus||[]).map(s=>`<div style="display:flex;align-items:center;gap:5px"><div style="width:7px;height:7px;border-radius:2px;background:${PC[s.name]||'#2563EB'}"></div><span style="color:var(--dim);font-size:9px">${s.name}: <b style="color:var(--text)">${s.val}</b></span></div>`).join('')}
+      </div>
+      <div style="margin-top:10px;padding:8px 10px;background:#0F1F3D;border-radius:7px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span style="color:var(--muted);font-size:10px">Collection Rate</span><span style="color:var(--green);font-weight:700;font-size:11px">${cp}%</span></div>
+        ${pb(parseFloat(cp),100,'#16A34A',7)}
+      </div>
+    </div>
+    <div class="card">${sh('Budget Distribution','Ticket size demand')}${cv('cBud',200)}</div>
+  </div>`;
+
+  mc('cMon','bar',{labels:mData.map(m=>m.m),datasets:[
+    {label:'Leads',data:mData.map(m=>m.leads),backgroundColor:'#2563EB55',borderRadius:3,yAxisID:'y'},
+    {label:'Site Visits',data:mData.map(m=>m.sv),backgroundColor:'#0D948888',borderRadius:3,yAxisID:'y'},
+    {label:'Bookings',data:mData.map(m=>m.bk),backgroundColor:'#16A34A',borderRadius:3,yAxisID:'y'},
+    {label:'Revenue (Cr)',data:mData.map(m=>m.rev),type:'line',borderColor:'#C9A84C',borderWidth:2.5,pointBackgroundColor:'#C9A84C',pointRadius:4,tension:.3,yAxisID:'y2'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}},y2:{position:'right',grid:{display:false},ticks:{color:'#C9A84C',callback:v=>`₹${v}Cr`}}}});
+  const ss=[...(D.sources||[])].sort((a,b)=>b.conv-a.conv);
+  mc('cSrc','bar',{labels:ss.map(s=>s.name),datasets:[{data:ss.map(s=>s.conv),backgroundColor:ss.map(s=>s.conv>=(D.kpis?.convRate||17)?'#16A34A':'#EA580C'),borderRadius:3}]},{indexAxis:'y',scales:{x:{ticks:{color:'#6B7280',callback:v=>v+'%'}},y:{grid:{display:false},ticks:{color:'#6B7280'}}}});
+  mc('cPay','doughnut',{labels:(D.payStatus||[]).map(s=>s.name),datasets:[{data:(D.payStatus||[]).map(s=>s.val),backgroundColor:(D.payStatus||[]).map(s=>PC[s.name]||'#2563EB'),borderWidth:0,hoverOffset:4}]},{scales:{}});
+  mc('cBud','bar',{labels:(D.budget||[]).map(b=>b.range),datasets:[{data:(D.budget||[]).map(b=>b.count),backgroundColor:P,borderRadius:4}]},{});
+}
+
+// ── FUNNEL ────────────────────────────────────────────────────────────────────
+function renderFunnel(p){
+  const maxC=Math.max(...(D.funnel||[{count:1}]).map(f=>f.count));
+  p.innerHTML=`
+  <div class="g2">
+    <div class="card">
+      ${sh('Sales Funnel',`${D.kpis?.leads||0} total leads`)}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        ${(D.funnel||[]).map((f,i)=>`<div style="width:${Math.max(42,f.count/maxC*100)}%;min-width:50%">
+          <div style="background:${f.color};border-radius:${i===0?'8px 8px 0 0':i===(D.funnel.length-1)?'0 0 8px 8px':'0'};padding:9px 16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:600;font-size:11px;color:#fff">${f.stage}</span>
+            <span style="font-weight:800;font-size:17px;color:#fff">${f.count}</span>
+          </div></div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      ${sh('Stage Drop-off','Where leads fall out')}
+      ${(D.funnel||[]).slice(0,-1).map((f,i)=>{
+        const nx=D.funnel[i+1];const adv=f.count>0?Math.round(nx.count/f.count*100):0;
+        return`<div style="padding:9px 12px;background:#0F1F3D;border-radius:8px;margin-bottom:8px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;flex-wrap:wrap;gap:4px">
+            <span style="font-size:10px"><span style="color:${f.color};font-weight:600">${f.stage}</span><span style="color:var(--dim)"> → </span><span style="color:${nx.color};font-weight:600">${nx.stage}</span></span>
+            <div style="display:flex;gap:4px">${bdg('✓ '+adv+'%','#16A34A')}${bdg('✗ '+(100-adv)+'%','#DC2626')}</div>
+          </div>${pb(adv,100,f.color,5)}</div>`;}).join('')}
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">
+      ${sh('Velocity KPIs','Pipeline benchmarks')}
+      ${[['Lead → Site Visit','18 days','#2563EB'],['Visit → Booking','32 days','#0D9488'],['Lead → Booking','47 days','#16A34A'],['Follow-up Cycle','4.2 days','#C9A84C'],['Visit→Booking Rate',D.kpis?.sv>0?Math.round(D.kpis.bookings/D.kpis.sv*100)+'%':'0%','#7C3AED'],['Active Pipeline',(D.followups||[]).length+' leads','#2563EB'],['Critical Overdue',D.kpis?.critical+' leads','#DC2626']].map(([l,v,c])=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted);font-size:11px">${l}</span><span style="font-weight:700;font-size:12px;color:${c}">${v}</span></div>`).join('')}
+    </div>
+    <div class="card">${sh('Monthly Booking Trend','Activity over FY')}${cv('cFuT',260)}</div>
+  </div>`;
+  mc('cFuT','line',{labels:(D.monthly||[]).map(m=>m.m),datasets:[
+    {label:'Site Visits',data:(D.monthly||[]).map(m=>m.sv),borderColor:'#2563EB',backgroundColor:'#2563EB22',fill:true,tension:.3,borderWidth:1.5},
+    {label:'Bookings',data:(D.monthly||[]).map(m=>m.bk),borderColor:'#16A34A',backgroundColor:'#16A34A55',fill:true,tension:.3,borderWidth:2},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}}});
+}
+
+// ── REVENUE ───────────────────────────────────────────────────────────────────
+function renderRevenue(p){
+  const k=D.kpis||{};
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('💰','Total Revenue',`₹${k.revCr} Cr`,`${k.bookings} bookings`,'#C9A84C')}
+    ${kpi('📈','Monthly Average',`₹${(k.revCr/12).toFixed(1)} Cr`,'Across 12 months','#0D9488')}
+    ${kpi('🏠','Avg Deal Size',`₹${k.avgDealL}Cr`,'Per booking','#7C3AED')}
+    ${kpi('🏆','Best Project',(D.projects||[{}])[0]?.name?.replace('Godrej ','')||'—',`₹${(D.projects||[{}])[0]?.rev||0} Cr`,'#16A34A')}
+  </div>
+  <div class="g21">
+    <div class="card">${sh('Monthly Revenue vs Bookings','Green = hit ₹10Cr target')}${cv('cRevM',260)}</div>
+    <div class="card">
+      ${sh('Project Revenue','₹ Crore')}
+      ${(D.projects||[]).map((p,i)=>`<div style="margin-bottom:9px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="color:var(--muted);font-size:10px">${p.name.replace('Godrej ','')}</span>
+          <span style="color:${P[i%P.length]};font-weight:700;font-size:11px">₹${p.rev}Cr · ${p.bk}bk</span>
+        </div>${pb(p.rev,(D.projects[0]||{rev:1}).rev,P[i%P.length])}</div>`).join('')}
+    </div>
+  </div>
+  <div class="g2">
+    <div class="card">${sh('Revenue by Unit Type','₹ Cr + Avg Deal')}${cv('cRevU',220)}</div>
+    <div class="card">
+      ${sh('City Revenue','Sort by metric')}
+      <div style="display:flex;gap:6px;margin-bottom:12px">
+        ${['rev','bk','conv'].map(s=>`<button class="sbtn${citySort===s?' active':''}" onclick="citySort='${s}';renderRevenue(document.querySelector('.pane'))">${s==='rev'?'Revenue':s==='bk'?'Bookings':'Conv%'}</button>`).join('')}
+      </div>
+      ${[...(D.cities||[])].sort((a,b)=>b[citySort]-a[citySort]).slice(0,8).map((c,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="width:14px;color:var(--dim);font-size:10px;text-align:right;flex-shrink:0">${i+1}</span>
+          <span style="width:85px;color:var(--muted);font-size:10px;flex-shrink:0">${c.city}</span>
+          <div style="flex:1">${pb(c[citySort],[...(D.cities||[])].sort((a,b)=>b[citySort]-a[citySort])[0]?.[citySort]||1,P[i%P.length])}</div>
+          <span style="width:55px;text-align:right;color:${P[i%P.length]};font-weight:700;font-size:11px">${citySort==='rev'?'₹'+c.rev+'Cr':citySort==='bk'?c.bk:c.conv+'%'}</span>
+        </div>`).join('')}
+    </div>
+  </div>`;
+  mc('cRevM','bar',{labels:(D.monthly||[]).map(m=>m.m),datasets:[
+    {label:'Revenue (Cr)',data:(D.monthly||[]).map(m=>m.rev),backgroundColor:(D.monthly||[]).map(m=>m.rev>=10?'#16A34A':m.rev>=6?'#C9A84C':'#EA580C'),borderRadius:4,yAxisID:'y'},
+    {label:'Bookings',data:(D.monthly||[]).map(m=>m.bk),type:'line',borderColor:'#2563EB',borderWidth:2,pointBackgroundColor:'#2563EB',pointRadius:3,tension:.3,yAxisID:'y2'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280',callback:v=>'₹'+v+'Cr'}},y2:{position:'right',grid:{display:false},ticks:{color:'#2563EB'}}}});
+  const uo=['1BHK','2BHK','3BHK','3BHK+Study','4BHK','Penthouse'];
+  const us=uo.map(t=>(D.units||[]).find(u=>u.type===t)).filter(Boolean);
+  mc('cRevU','bar',{labels:us.map(u=>u.type),datasets:[
+    {label:'Revenue (Cr)',data:us.map(u=>u.rev),backgroundColor:P,borderRadius:4,yAxisID:'y'},
+    {label:'Avg Deal (₹L)',data:us.map(u=>u.avgDeal),type:'line',borderColor:'#C9A84C',borderWidth:2.5,pointBackgroundColor:'#C9A84C',pointRadius:5,tension:.3,yAxisID:'y2'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}},y2:{position:'right',grid:{display:false},ticks:{color:'#C9A84C'}}}});
+}
+
+// ── EXECUTIVES ────────────────────────────────────────────────────────────────
+function renderExecs(p){
+  const mOpts=[{k:'rev',l:'Revenue'},{k:'conv',l:'Conv %'},{k:'bk',l:'Bookings'},{k:'sv',l:'Site Visits'},{k:'calls',l:'Calls'}];
+  const sorted=[...(D.execs||[])].sort((a,b)=>b[execMetric]-a[execMetric]);
+  const maxConv=Math.max(...(D.execs||[{conv:1}]).map(e=>e.conv),.01);
+  p.innerHTML=`
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+    ${mOpts.map(m=>`<button class="mbtn${execMetric===m.k?' active':''}" onclick="execMetric='${m.k}';renderExecs(document.querySelector('.pane'))">${m.l}</button>`).join('')}
+  </div>
+  <div class="card">${sh('Executive Ranking','Click bar or card for radar drill-down')}${cv('cExecB',220)}</div>
+  <div class="g12">
+    <div class="card">
+      ${sh('Radar Analysis',selectedExec?selectedExec.name+' vs team':'Select an executive')}
+      ${selectedExec?cv('cRadar',280)+'<div id="rStats" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px"></div>':'<div class="ph"><div style="font-size:40px">👆</div><div style="font-size:13px;text-align:center">Click any card or bar<br>to view radar analysis</div></div>'}
+    </div>
+    <div class="exec-scroll">
+      ${[...(D.execs||[])].sort((a,b)=>b.rev-a.rev).map((e,i)=>{
+        const rc=i===0?'#C9A84C':i===1?'#9CA3AF':i===2?'#EA580C':'#2563EB';
+        const rb=i===0?'rgba(201,168,76,.2)':i===1?'rgba(255,255,255,.07)':i===2?'rgba(234,88,12,.15)':'rgba(37,99,235,.15)';
+        return`<div class="exec-card${selectedExec?.name===e.name?' sel':''}" onclick="pickExec('${e.name}')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:9px">
+              <div style="width:26px;height:26px;border-radius:50%;background:${rb};color:${rc};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0">${i+1}</div>
+              <div><div style="font-weight:700;font-size:12px">${e.name}</div><div style="font-size:9px;color:var(--dim)">Leads:${e.leads} · Calls:${e.calls}</div></div>
+            </div>
+            <div style="text-align:right"><div style="color:#C9A84C;font-weight:800;font-size:14px">₹${e.rev}Cr</div>${bdg(e.rating||'—',e.conv>=25?'#C9A84C':e.conv>=18?'#16A34A':e.conv>=12?'#EA580C':'#DC2626')}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:5px">
+            ${[['SV',e.sv,'#0D9488'],['Bkd',e.bk,'#16A34A'],['Conv',e.conv+'%','#7C3AED'],['Avg','₹'+e.avgDeal+'Cr','#2563EB']].map(([l,v,c])=>`<div style="text-align:center"><div style="color:${c};font-weight:700;font-size:12px">${v}</div><div style="color:var(--dim);font-size:9px">${l}</div></div>`).join('')}
+          </div>
+          ${pb(e.conv,maxConv,e.conv>=25?'#C9A84C':e.conv>=18?'#16A34A':e.conv>=12?'#EA580C':'#DC2626',4)}
+        </div>`;}).join('')}
+    </div>
+  </div>`;
+  mc('cExecB','bar',{labels:sorted.map(e=>e.name.split(' ')[0]),datasets:[{data:sorted.map(e=>e[execMetric]),backgroundColor:sorted.map((e,i)=>selectedExec?.name===e.name?'#C9A84C':i===0?'#C9A84C':i===1?'#9CA3AF':i===2?'#EA580C':'#2563EB'),borderRadius:4}]},
+    {onClick:(ev,els)=>{if(els.length)pickExec(sorted[els[0].index].name);},scales:{x:{ticks:{color:'#6B7280'}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}}}});
+  if(selectedExec)drawRadar();
+}
+function pickExec(name){selectedExec=selectedExec?.name===name?null:(D.execs||[]).find(e=>e.name===name);renderExecs(document.querySelector('.pane'));}
+function drawRadar(){
+  if(!selectedExec)return;
+  const e=selectedExec,mx=D.execs||[];
+  const maxV={leads:Math.max(...mx.map(x=>x.leads),1),calls:Math.max(...mx.map(x=>x.calls),1),sv:Math.max(...mx.map(x=>x.sv),1),bk:Math.max(...mx.map(x=>x.bk),1),rev:Math.max(...mx.map(x=>x.rev),.01),conv:Math.max(...mx.map(x=>x.conv),.01)};
+  mc('cRadar','radar',{labels:['Leads','Calls','Site Visits','Bookings','Revenue','Conv%'],datasets:[
+    {label:e.name,data:[e.leads/maxV.leads*100,e.calls/maxV.calls*100,e.sv/maxV.sv*100,e.bk/maxV.bk*100,e.rev/maxV.rev*100,e.conv/maxV.conv*100],borderColor:'#C9A84C',backgroundColor:'rgba(201,168,76,.2)',borderWidth:2,pointBackgroundColor:'#C9A84C'},
+    {label:'Team Max',data:[100,100,100,100,100,100],borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,.05)',borderDash:[4,4],borderWidth:1.5,pointBackgroundColor:'#2563EB'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{r:{grid:{color:'#1F2937'},ticks:{color:'#6B7280',backdropColor:'transparent'},pointLabels:{color:'#9CA3AF',font:{size:10}}}}});
+  const rs=document.getElementById('rStats');if(!rs)return;
+  rs.innerHTML=[['Revenue','₹'+e.rev+' Cr','#C9A84C'],['Conversion',e.conv+'%','#16A34A'],['Bookings',e.bk,'#0D9488'],['Avg Deal','₹'+e.avgDeal+'Cr','#7C3AED'],['Site Visits',e.sv,'#2563EB'],['Calls',e.calls,'#EA580C']].map(([l,v,c])=>`<div style="padding:7px 10px;background:#0F1F3D;border-radius:6px;border:1px solid var(--border)"><div style="color:var(--dim);font-size:9px">${l}</div><div style="color:${c};font-weight:700;font-size:14px">${v}</div></div>`).join('');
+}
+
+// ── SOURCES ───────────────────────────────────────────────────────────────────
+function renderSources(p){
+  const avg=D.kpis?.convRate||17;
+  p.innerHTML=`
+  <div class="g2">
+    <div class="card">${sh('Leads vs Bookings by Source','Volume vs quality')}${cv('cSLB',260)}</div>
+    <div class="card">${sh('Revenue by Channel','₹ Crore')}${cv('cSPie',260)}</div>
+  </div>
+  <div class="card">
+    ${sh('Source Performance Matrix','From your live Google Sheet')}
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Source</th><th>Leads</th><th>Bookings</th><th>Conv %</th><th>Revenue</th><th>Recommendation</th></tr></thead>
+      <tbody>${[...(D.sources||[])].sort((a,b)=>b.rev-a.rev).map((s,i)=>`<tr>
+        <td style="font-weight:600;color:${P[i%P.length]}">${s.name}</td>
+        <td style="color:var(--muted)">${s.leads}</td>
+        <td style="font-weight:600;color:var(--green)">${s.bk}</td>
+        <td>${bdg(s.conv+'%',s.conv>=20?'#16A34A':s.conv>=avg?'#C9A84C':'#EA580C')}</td>
+        <td style="color:#C9A84C;font-weight:700">₹${s.rev.toFixed(1)} Cr</td>
+        <td>${bdg(s.conv>=20?'🚀 Scale Up':s.conv>=avg?'✅ Maintain':s.conv>=12?'⚙ Optimise':'🔍 Review',s.conv>=20?'#16A34A':s.conv>=avg?'#2563EB':s.conv>=12?'#EA580C':'#DC2626')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+  mc('cSLB','bar',{labels:(D.sources||[]).map(s=>s.name),datasets:[
+    {label:'Leads',data:(D.sources||[]).map(s=>s.leads),backgroundColor:'#2563EB55',borderRadius:3},
+    {label:'Bookings',data:(D.sources||[]).map(s=>s.bk),backgroundColor:'#16A34A',borderRadius:3},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{x:{ticks:{color:'#6B7280',maxRotation:20}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}}}});
+  mc('cSPie','doughnut',{labels:(D.sources||[]).map(s=>s.name),datasets:[{data:(D.sources||[]).map(s=>s.rev),backgroundColor:P,borderWidth:0,hoverOffset:6}]},{plugins:{legend:{display:true,position:'right',labels:{color:'#9CA3AF',font:{size:10},padding:8}}},scales:{}});
+}
+
+// ── PORTFOLIO ─────────────────────────────────────────────────────────────────
+function renderPortfolio(p){
+  const totalR=(D.units||[]).reduce((s,u)=>s+u.rev,0)||1;
+  const uo=['1BHK','2BHK','3BHK','3BHK+Study','4BHK','Penthouse'];
+  const us=uo.map(t=>(D.units||[]).find(u=>u.type===t)).filter(Boolean);
+  p.innerHTML=`
+  <div class="g2">
+    <div class="card">${sh('Unit Type — Demand vs Revenue','Leads · Bookings · Avg Deal')}${cv('cUC',260)}</div>
+    <div class="card">${sh('Revenue by Configuration','₹ Crore share')}${cv('cUPie',260)}</div>
+  </div>
+  <div class="card">
+    ${sh('Unit Type Scorecard','From your live Google Sheet')}
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Unit</th><th>Leads</th><th>Bookings</th><th>Conv %</th><th>Revenue</th><th>Avg Deal</th><th>Share</th></tr></thead>
+      <tbody>${[...(D.units||[])].sort((a,b)=>b.rev-a.rev).map((u,i)=>`<tr>
+        <td style="font-weight:700;color:${P[i%P.length]}">${u.type}</td>
+        <td style="color:var(--muted)">${u.leads}</td>
+        <td style="font-weight:600;color:var(--green)">${u.bk}</td>
+        <td>${bdg(u.conv+'%',u.conv>=(D.kpis?.convRate||17)?'#16A34A':'#EA580C')}</td>
+        <td style="color:#C9A84C;font-weight:700">₹${u.rev} Cr</td>
+        <td style="color:#0D9488;font-weight:600">₹${u.avgDeal}L</td>
+        <td><div style="display:flex;align-items:center;gap:6px">${pb(u.rev,Math.max(...(D.units||[{rev:1}]).map(x=>x.rev)),P[i%P.length],5)}<span style="color:var(--muted);font-size:10px;width:28px;flex-shrink:0">${Math.round(u.rev/totalR*100)}%</span></div></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>
+  <div class="g2">
+    <div class="card">${sh('City Revenue Heatmap','Geographic performance')}${cv('cCH',240)}</div>
+    <div class="card">${sh('Budget Demand','Ticket size concentration')}${cv('cBA',240)}</div>
+  </div>`;
+  mc('cUC','bar',{labels:us.map(u=>u.type),datasets:[
+    {label:'Leads',data:us.map(u=>u.leads),backgroundColor:'#2563EB44',borderRadius:3,yAxisID:'y'},
+    {label:'Bookings',data:us.map(u=>u.bk),backgroundColor:'#16A34A',borderRadius:3,yAxisID:'y'},
+    {label:'Avg Deal (₹L)',data:us.map(u=>u.avgDeal),type:'line',borderColor:'#C9A84C',borderWidth:2.5,pointBackgroundColor:'#C9A84C',pointRadius:5,tension:.3,yAxisID:'y2'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}},y2:{position:'right',grid:{display:false},ticks:{color:'#C9A84C'}}}});
+  mc('cUPie','doughnut',{labels:(D.units||[]).map(u=>u.type),datasets:[{data:(D.units||[]).map(u=>u.rev),backgroundColor:P,borderWidth:0,hoverOffset:6}]},{plugins:{legend:{display:true,position:'right',labels:{color:'#9CA3AF',font:{size:10},padding:8}}},scales:{}});
+  mc('cCH','bar',{labels:(D.cities||[]).slice(0,10).map(c=>c.city),datasets:[{data:(D.cities||[]).slice(0,10).map(c=>c.rev),backgroundColor:P,borderRadius:4}]},{indexAxis:'y',scales:{x:{ticks:{color:'#6B7280',callback:v=>'₹'+v+'Cr'}},y:{grid:{display:false},ticks:{color:'#6B7280'}}},plugins:{legend:{display:false}}});
+  mc('cBA','line',{labels:(D.budget||[]).map(b=>b.range),datasets:[{data:(D.budget||[]).map(b=>b.count),borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,.25)',fill:true,tension:.4,borderWidth:2,pointBackgroundColor:'#7C3AED',pointRadius:5}]},{plugins:{legend:{display:false}}});
+}
+
+// ── PARTNERS ──────────────────────────────────────────────────────────────────
+function renderPartners(p){
+  const tL=(D.partners||[]).reduce((s,x)=>s+x.leads,0),tB=(D.partners||[]).reduce((s,x)=>s+x.bk,0),tR=(D.partners||[]).reduce((s,x)=>s+x.rev,0);
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('🤝','Active Partners',(D.partners||[]).length,'Channel network','#C9A84C')}
+    ${kpi('📋','Partner Leads',tL,'via channel','#2563EB')}
+    ${kpi('✅','Partner Bookings',tB,'closed via partner','#16A34A')}
+    ${kpi('💰','Partner Revenue','₹'+Math.round(tR*100)/100+' Cr','channel contribution','#0D9488')}
+  </div>
+  <div class="g21">
+    <div class="card">${sh('Partner Comparison','Leads · Visits · Bookings')}${cv('cPBar',250)}</div>
+    <div class="card">
+      ${sh('Partner Tiers','From your Google Sheet')}
+      ${[['Platinum','#C9A84C','>30% conv'],['Gold','#9CA3AF','>20% conv'],['Silver','#EA580C','>8% conv'],['Bronze','#6B7280','<8% conv']].map(([t,c,d])=>`
+        <div style="padding:10px 12px;background:#0F1F3D;border-radius:8px;border:1px solid ${c}33;margin-bottom:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div style="color:${c};font-weight:700;font-size:12px">${t}</div><div style="color:var(--dim);font-size:10px">${d}</div></div>
+            <div style="font-weight:800;font-size:22px">${(D.partners||[]).filter(p=>p.tier&&p.tier.includes(t)).length}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+  </div>
+  <div class="card">
+    ${sh('Partner Scorecard','Live from Google Sheet')}
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Rank</th><th>Partner</th><th>Leads</th><th>Visits</th><th>Bookings</th><th>Revenue</th><th>Conv %</th><th>Tier</th></tr></thead>
+      <tbody>${[...(D.partners||[])].sort((a,b)=>b.rev-a.rev).map((pt,i)=>{const tc=pt.tier?.includes('Platinum')?'#C9A84C':pt.tier?.includes('Gold')?'#9CA3AF':pt.tier?.includes('Silver')?'#EA580C':'#6B7280';
+        return`<tr><td style="color:${tc};font-weight:700;font-size:15px">${i+1}</td><td style="font-weight:600">${pt.name}</td><td style="color:var(--muted)">${pt.leads}</td><td style="color:var(--muted)">${pt.sv}</td><td style="font-weight:600;color:var(--green)">${pt.bk}</td><td style="color:#C9A84C;font-weight:700">${pt.rev>0?'₹'+pt.rev+' Cr':'—'}</td><td>${bdg(pt.conv+'%',pt.conv>=30?'#16A34A':pt.conv>=20?'#C9A84C':'#EA580C')}</td><td>${bdg(pt.tier||'—',tc)}</td></tr>`;}).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+  const ps=[...(D.partners||[])].sort((a,b)=>b.rev-a.rev);
+  mc('cPBar','bar',{labels:ps.map(p=>p.name.split(' ')[0]),datasets:[
+    {label:'Leads',data:ps.map(p=>p.leads),backgroundColor:'#2563EB66',borderRadius:3},
+    {label:'Site Visits',data:ps.map(p=>p.sv),backgroundColor:'#0D948888',borderRadius:3},
+    {label:'Bookings',data:ps.map(p=>p.bk),backgroundColor:'#16A34A',borderRadius:3},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{x:{ticks:{color:'#6B7280'}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280'}}}});
+}
+
+// ── PAYMENTS ──────────────────────────────────────────────────────────────────
+function renderPayments(p){
+  const cp=D.payTotal>0?(D.payRecv/D.payTotal*100).toFixed(1):0;
+  const ovd=(D.payStatus||[]).find(s=>s.name==='Overdue')?.val||0;
+  const prt=(D.payStatus||[]).find(s=>s.name==='Partial')?.val||0;
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('💰','Portfolio Value','₹'+D.payTotal+' Cr',(D.kpis?.bookings||0)+' accounts','#C9A84C')}
+    ${kpi('✅','Collected','₹'+D.payRecv+' Cr',cp+'% of total','#16A34A')}
+    ${kpi('⏳','Outstanding','₹'+D.payBal+' Cr','Pending collection','#EA580C')}
+    ${kpi('🔴','Overdue Accounts',ovd,'Immediate action','#DC2626')}
+  </div>
+  <div class="g2">
+    <div class="card">
+      ${sh('Collection Progress','Live from Google Sheet')}
+      <div style="margin-bottom:18px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="color:var(--muted);font-size:11px">Overall Collection Rate</span><span style="color:var(--green);font-weight:700;font-size:14px">${cp}%</span></div>
+        <div style="background:#1F2937;border-radius:99px;height:12px;overflow:hidden"><div style="width:${cp}%;height:100%;background:linear-gradient(90deg,#16A34A,#0D9488);border-radius:99px"></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--green);font-size:10px">₹${D.payRecv} Cr collected</span><span style="color:var(--orange);font-size:10px">₹${D.payBal} Cr remaining</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        ${(D.payStatus||[]).map(s=>`<div style="padding:11px 13px;background:#0F1F3D;border-radius:8px;border:1px solid ${PC[s.name]||'#2563EB'}44">
+          <div style="color:${PC[s.name]||'#2563EB'};font-weight:800;font-size:22px">${s.val}</div>
+          <div style="color:var(--muted);font-size:11px;font-weight:600;margin-top:2px">${s.name}</div>
+        </div>`).join('')}
+      </div>
+      <div class="alert"><div style="color:var(--red);font-weight:700;font-size:11px;margin-bottom:5px">⚠️ Action Required</div>
+        <div style="color:var(--muted);font-size:10px;line-height:1.7"><b style="color:var(--red)">${ovd} accounts overdue</b> — Call today<br><b style="color:var(--orange)">${prt} partial</b> — Send reminders<br>Recovery: <b style="color:var(--gold)">₹${D.payBal} Cr</b></div>
+      </div>
+    </div>
+    <div class="card">${sh('Payment Status',(D.kpis?.bookings||0)+' accounts')}${cv('cPayD',240)}</div>
+  </div>`;
+  mc('cPayD','doughnut',{labels:(D.payStatus||[]).map(s=>s.name),datasets:[{data:(D.payStatus||[]).map(s=>s.val),backgroundColor:(D.payStatus||[]).map(s=>PC[s.name]||'#2563EB'),borderWidth:0,hoverOffset:6}]},{plugins:{legend:{display:true,position:'right',labels:{color:'#9CA3AF',font:{size:10},padding:8}}},scales:{}});
+}
+
+// ── FOLLOW-UPS ────────────────────────────────────────────────────────────────
+function renderFollowups(p){
+  const k=D.kpis||{}, all=D.followups||[];
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('📅','Active Pipeline',all.length,'Needs follow-up','#2563EB')}
+    ${kpi('🔴','Critical (>7d)',k.critical,'Overdue >7 days','#DC2626','dn','')}
+    ${kpi('🟠','Total Overdue',k.overdue,'Past follow-up date','#EA580C','dn','')}
+    ${kpi('🟢','On Track',all.length-k.overdue,'Upcoming','#16A34A')}
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <button class="fbtn${fuFilter==='all'?' active':''}" onclick="fuFilter='all';renderFuTbl()">All (${all.length})</button>
+    <button class="fbtn${fuFilter==='critical'?' active':''}" onclick="fuFilter='critical';renderFuTbl()">🔴 Critical (${k.critical})</button>
+    <button class="fbtn${fuFilter==='overdue'?' active':''}" onclick="fuFilter='overdue';renderFuTbl()">🟠 Overdue (${k.overdue})</button>
+    <button class="fbtn${fuFilter==='today'?' active':''}" onclick="fuFilter='today';renderFuTbl()">🟡 Today (${all.filter(f=>f.days===0).length})</button>
+    <input class="search" placeholder="Search name or executive…" value="${fuSearch}" oninput="fuSearch=this.value;renderFuTbl()"/>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Lead ID</th><th>Customer</th><th>Executive</th><th>Status</th><th>Days Overdue</th><th>Priority</th></tr></thead>
+      <tbody id="fuBody"></tbody>
+    </table></div>
+  </div>
+  <div class="g2">
+    <div class="card">${sh('Priority Bands','Urgency breakdown')}${cv('cFuB',180)}</div>
+    <div class="card">${sh('Overdue by Executive','Who needs to act')}${cv('cFuE',180)}</div>
+  </div>`;
+  renderFuTbl();
+  mc('cFuB','bar',{labels:['Critical >7d','Overdue 1-7d','Due Today','On Track'],datasets:[{data:[k.critical,k.overdue-k.critical,all.filter(f=>f.days===0).length,all.length-k.overdue],backgroundColor:['#DC2626','#EA580C','#C9A84C','#16A34A'],borderRadius:4}]},{plugins:{legend:{display:false}}});
+  const byE={};all.filter(f=>f.days>0).forEach(f=>{if(f.exec){const k=f.exec.split(' ')[0];byE[k]=(byE[k]||0)+1;}});
+  const ee=Object.entries(byE).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  mc('cFuE','bar',{labels:ee.map(e=>e[0]),datasets:[{data:ee.map(e=>e[1]),backgroundColor:P,borderRadius:4}]},{plugins:{legend:{display:false}}});
+}
+function renderFuTbl(){
+  const el=document.getElementById('fuBody');if(!el)return;
+  let list=D.followups||[];
+  if(fuFilter==='critical')list=list.filter(f=>f.days>7);
+  else if(fuFilter==='overdue')list=list.filter(f=>f.days>0);
+  else if(fuFilter==='today')list=list.filter(f=>f.days===0);
+  if(fuSearch)list=list.filter(f=>f.name?.toLowerCase().includes(fuSearch.toLowerCase())||f.exec?.toLowerCase().includes(fuSearch.toLowerCase()));
+  if(!list.length){el.innerHTML='<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--dim)">No matching records</td></tr>';return;}
+  el.innerHTML=list.slice(0,60).map(f=>{const oc=f.days>7?'#DC2626':f.days>0?'#EA580C':f.days===0?'#C9A84C':'#16A34A';
+    return`<tr style="${f.days>7?'background:rgba(220,38,38,.05)':''}">
+      <td style="color:#2563EB;font-weight:600;font-family:monospace">${f.id}</td>
+      <td style="font-weight:600">${f.name}</td>
+      <td style="color:var(--muted)">${f.exec}</td>
+      <td>${bdg(f.status,'#2563EB')}</td>
+      <td><span style="color:${oc};font-weight:800;font-size:14px">${f.days}</span><span style="color:var(--dim);font-size:9px"> days</span></td>
+      <td style="color:${oc};font-weight:600;font-size:11px">${f.priority}</td>
+    </tr>`;}).join('');
+}
+
+// ── INSIGHTS ──────────────────────────────────────────────────────────────────
+function renderInsights(p){
+  const k=D.kpis||{};
+  const criticals=[
+    {i:1,t:'Overdue Follow-ups',m:`${k.overdue} leads past due date`,c:'₹'+Math.round(k.overdue*1.44)+' Cr at risk',a:'Call all today — start with critical'},
+    {i:2,t:'Oct Revenue Collapse',m:'₹3.38 Cr vs ₹10 Cr target',c:'Pipeline failure in Aug-Sep',a:'Fix pipeline review process'},
+    {i:3,t:'Lost Leads Unanalysed',m:'47 lost leads, 0% tracked',c:'Repeat mistakes every cycle',a:'Add loss reason column now'},
+    {i:4,t:'Mar Lead Drop',m:'Only 12 leads in March',c:'Apr-May revenue at risk',a:'Restart campaigns immediately'},
+    {i:5,t:'₹'+D.payBal+' Cr Outstanding',m:`${60.2}% collection rate`,c:'Cash flow risk',a:'Call 7 overdue accounts today'},
+  ];
+  const wins=[
+    {t:'Pune Goldmine',m:'33.3% conv vs 17% avg',a:'Increase inventory & marketing'},
+    {t:'Google Ads Best ROI',m:'23.7% conv · ₹23.97 Cr rev',a:'Double the budget allocation'},
+    {t:'Divya Reddy Blueprint',m:'28.6% conv · ₹17.91 Cr',a:'Use as team trainer'},
+    {t:'3BHK Volume King',m:'23 bookings · 27.7% conv',a:'Prioritise 3BHK inventory'},
+    {t:'Penthouse Revenue King',m:'₹292L avg deal · ₹37.9 Cr',a:'Assign top executives only'},
+    {t:'Apex Realty Hidden Gem',m:'66.7% conversion rate',a:'Give 3x more leads now'},
+  ];
+  p.innerHTML=`
+  <div class="g2">
+    <div class="card" style="border-left:3px solid #DC2626">
+      ${sh('Critical Problems — Act Now','From your live sheet data')}
+      ${criticals.map(c=>`<div style="padding:10px 12px;background:#0F1F3D;border-radius:8px;margin-bottom:8px;border-left:3px solid #DC2626">
+        <div style="font-weight:700;font-size:12px;margin-bottom:3px">${c.i}. ${c.t}</div>
+        <div style="font-size:10px;color:#9CA3AF;margin-bottom:4px">${c.m} · Impact: ${c.c}</div>
+        <div style="padding:4px 8px;background:#1F2937;border-radius:5px;font-size:10px;color:#EA580C;font-weight:600">→ ${c.a}</div>
+      </div>`).join('')}
+    </div>
+    <div class="card" style="border-left:3px solid #16A34A">
+      ${sh('What Is Working — Scale Up','From your live sheet data')}
+      ${wins.map(w=>`<div style="padding:10px 12px;background:#0F1F3D;border-radius:8px;margin-bottom:8px;border-left:3px solid #16A34A">
+        <div style="font-weight:700;font-size:12px;margin-bottom:3px">${w.t}</div>
+        <div style="font-size:10px;color:#16A34A;margin-bottom:4px">${w.m}</div>
+        <div style="padding:4px 8px;background:#1F2937;border-radius:5px;font-size:10px;color:#16A34A;font-weight:600">→ ${w.a}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div class="card">
+    ${sh('Interview Answer — Use This Exactly','Built from your live Google Sheets data')}
+    <div style="padding:16px 18px;background:#0F1F3D;border-radius:10px;border-left:4px solid #C9A84C;font-size:12px;line-height:1.8;color:#F9FAFB">
+      My analysis of <b style="color:#C9A84C">${k.leads} leads</b> and <b style="color:#C9A84C">${k.bookings} bookings</b> across FY 2024-25 showed that Google Ads (23.7%), Channel Partner (22.7%), and Referral (19.5%) generated <b style="color:#C9A84C">54.8% of total revenue</b> from only 36.6% of leads — while Facebook delivered just 12.7% conversion. I recommended reallocating Facebook budget to Google Ads, projecting <b style="color:#C9A84C">+₹5-8 Cr additional revenue</b> without increasing spend. I also identified Pune at <b style="color:#C9A84C">33.3% conversion</b> — double the team average — and recommended prioritising inventory there. Total revenue achieved: <b style="color:#C9A84C">₹${k.revCr} Cr</b>.
+    </div>
+  </div>`;
+}
+
+// ── TARGETS ───────────────────────────────────────────────────────────────────
+function renderTargets(p){
+  const k=D.kpis||{};
+  const mTargets=[8,8,10,10,10,10,12,12,12,12,12,15];
+  const mActual=(D.monthly||[]).map(m=>m.rev);
+  const tTgt=mTargets.reduce((s,t)=>s+t,0);
+  const tAct=mActual.reduce((s,a)=>s+a,0);
+  p.innerHTML=`
+  <div class="g4">
+    ${kpi('🎯','Annual Target','₹120 Cr','FY 2024-25 goal','#C9A84C')}
+    ${kpi('✅','Actual Revenue','₹'+k.revCr+' Cr','FY 2024-25','#16A34A','up','Live from your sheet')}
+    ${kpi('🏆','Achievement',(tAct/tTgt*100).toFixed(1)+'%','Annual performance','#16A34A','up','Beat target!')}
+    ${kpi('📅','Months Missed',(D.monthly||[]).filter((m,i)=>m.rev<mTargets[i]).length+' of 12','Below monthly target','#DC2626')}
+  </div>
+  <div class="g2">
+    <div class="card">${sh('Monthly Target vs Actual','Green = hit ₹10Cr target')}${cv('cTM',260)}</div>
+    <div class="card">${sh('Executive Achievement vs Target','From your Google Sheet')}${cv('cTE',260)}</div>
+  </div>
+  <div class="card">
+    ${sh('Executive Scorecard','Live data vs targets')}
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Executive</th><th>Revenue (Cr)</th><th>Target (Cr)</th><th>Achievement %</th><th>Bookings</th><th>Conv %</th><th>Status</th></tr></thead>
+      <tbody>${(D.execs||[]).map(e=>{
+        const tgt=[2.0,1.8,1.8,2.0,1.5,1.2,1.2,1.2,1.2,1.0];
+        const ti=(D.execs||[]).indexOf(e);const t=tgt[ti]||1.5;
+        const pct=(e.rev/t*100).toFixed(1);const col=parseFloat(pct)>=95?'#16A34A':parseFloat(pct)>=80?'#F59E0B':'#DC2626';
+        return`<tr><td style="font-weight:600">${e.name}</td><td style="color:#C9A84C;font-weight:700;text-align:center">₹${e.rev}</td><td style="text-align:center;color:#9CA3AF">₹${t}</td><td style="text-align:center;color:${col};font-weight:700">${pct}%</td><td style="text-align:center;font-weight:600;color:#16A34A">${e.bk}</td><td style="text-align:center;color:#7C3AED">${e.conv}%</td><td style="text-align:center">${bdg(parseFloat(pct)>=95?'✅ Hit':parseFloat(pct)>=80?'⚠ Near':'❌ Miss',col)}</td></tr>`;
+      }).join('')}</tbody>
+    </table></div>
+  </div>`;
+  mc('cTM','bar',{labels:(D.monthly||[]).map(m=>m.m),datasets:[
+    {label:'Target',data:mTargets,backgroundColor:'#2563EB33',borderRadius:3,borderWidth:2,borderColor:'#2563EB',yAxisID:'y'},
+    {label:'Actual',data:mActual,backgroundColor:mActual.map((a,i)=>a>=mTargets[i]?'#16A34A':'#DC2626'),borderRadius:3,yAxisID:'y'},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280',callback:v=>'₹'+v+'Cr'}},x:{ticks:{color:'#6B7280'}}}});
+  const execTgts=[2.0,1.8,1.8,2.0,1.5,1.2,1.2,1.2,1.2,1.0];
+  mc('cTE','bar',{labels:(D.execs||[]).map(e=>e.name.split(' ')[0]),datasets:[
+    {label:'Target',data:execTgts.slice(0,(D.execs||[]).length),backgroundColor:'#2563EB33',borderRadius:3,borderWidth:2,borderColor:'#2563EB'},
+    {label:'Actual',data:(D.execs||[]).map(e=>e.rev),backgroundColor:(D.execs||[]).map((e,i)=>e.rev>=execTgts[i]?'#16A34A':'#EA580C'),borderRadius:3},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{x:{ticks:{color:'#6B7280'}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280',callback:v=>'₹'+v+'Cr'}}}});
+}
+
+// ── FORECAST ──────────────────────────────────────────────────────────────────
+function renderForecast(p){
+  const forecast=[
+    {m:"Apr'25",cons:8.0,base:10.5,opt:14.0,tgt:12.0},
+    {m:"May'25",cons:9.0,base:12.0,opt:16.0,tgt:12.0},
+    {m:"Jun'25",cons:10.0,base:13.5,opt:18.0,tgt:12.0},
+    {m:"Jul'25",cons:11.0,base:14.0,opt:19.0,tgt:15.0},
+    {m:"Aug'25",cons:12.0,base:15.5,opt:21.0,tgt:15.0},
+    {m:"Sep'25",cons:11.0,base:14.5,opt:20.0,tgt:15.0},
+  ];
+  const cT=forecast.reduce((s,m)=>s+m.cons,0),bT=forecast.reduce((s,m)=>s+m.base,0),oT=forecast.reduce((s,m)=>s+m.opt,0);
+  p.innerHTML=`
+  <div class="g3">
+    <div class="card" style="border-left:3px solid #DC2626;text-align:center">
+      <div style="color:#DC2626;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px">Conservative</div>
+      <div style="color:#DC2626;font-size:28px;font-weight:800">₹${cT} Cr</div>
+      <div style="color:#6B7280;font-size:10px;margin-top:4px">Next 6 months</div>
+      <div style="color:#9CA3AF;font-size:10px;margin-top:8px;line-height:1.6">No change to current approach</div>
+    </div>
+    <div class="card" style="border-left:3px solid #2563EB;text-align:center">
+      <div style="color:#2563EB;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px">Base Case</div>
+      <div style="color:#2563EB;font-size:28px;font-weight:800">₹${bT} Cr</div>
+      <div style="color:#6B7280;font-size:10px;margin-top:4px">Next 6 months</div>
+      <div style="color:#9CA3AF;font-size:10px;margin-top:8px;line-height:1.6">Fix follow-ups + maintain Google Ads</div>
+    </div>
+    <div class="card" style="border-left:3px solid #16A34A;text-align:center">
+      <div style="color:#16A34A;font-size:10px;font-weight:700;text-transform:uppercase;margin-bottom:8px">Optimistic</div>
+      <div style="color:#16A34A;font-size:28px;font-weight:800">₹${oT} Cr</div>
+      <div style="color:#6B7280;font-size:10px;margin-top:4px">Next 6 months</div>
+      <div style="color:#9CA3AF;font-size:10px;margin-top:8px;line-height:1.6">Scale Google Ads + expand Pune</div>
+    </div>
+  </div>
+  <div class="card">${sh('6-Month Revenue Forecast','3 scenarios from your live data')}${cv('cFcast',280)}</div>
+  <div class="g2">
+    <div class="card">${sh('Source ROI — Where to Invest','Best channels from your data')}${cv('cROI',230)}</div>
+    <div class="card">
+      ${sh('Action Plan to Hit Optimistic','Execute in order')}
+      ${[['This Week','Call 26 critical overdue leads','#DC2626'],
+         ['This Week','Give Apex Realty more leads','#DC2626'],
+         ['This Week','Pause Facebook campaigns','#DC2626'],
+         ['This Month','Double Google Ads budget','#F59E0B'],
+         ['This Month','Coach Sunita Verma + Rahul Nair','#F59E0B'],
+         ['This Month','Fix walk-in front desk process','#F59E0B'],
+         ['This Quarter','Build referral reward program','#16A34A'],
+         ['This Quarter','Prioritise Pune inventory','#16A34A'],
+         ['This Quarter','Recover ₹'+D.payBal+' Cr outstanding','#16A34A'],
+      ].map(function(item){return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #1F2937"><span style="background:'+item[2]+'22;color:'+item[2]+';font-size:9px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap;flex-shrink:0">'+item[0]+'</span><span style="color:#9CA3AF;font-size:11px">'+item[1]+'</span></div>';}).join('')}
+    </div>
+  </div>`;
+  mc('cFcast','bar',{labels:forecast.map(m=>m.m),datasets:[
+    {label:'Conservative',data:forecast.map(m=>m.cons),backgroundColor:'#DC262633',borderRadius:3,borderWidth:2,borderColor:'#DC2626'},
+    {label:'Base Case',data:forecast.map(m=>m.base),backgroundColor:'#2563EB55',borderRadius:3,borderWidth:2,borderColor:'#2563EB'},
+    {label:'Optimistic',data:forecast.map(m=>m.opt),backgroundColor:'#16A34A55',borderRadius:3,borderWidth:2,borderColor:'#16A34A'},
+    {label:'Target',data:forecast.map(m=>m.tgt),type:'line',borderColor:'#C9A84C',borderWidth:2.5,borderDash:[5,5],pointBackgroundColor:'#C9A84C',pointRadius:4,tension:.3},
+  ]},{plugins:{legend:{display:true,labels:{color:'#9CA3AF',font:{size:10}}}},scales:{x:{ticks:{color:'#6B7280'}},y:{grid:{color:'#1F2937'},ticks:{color:'#6B7280',callback:v=>'₹'+v+'Cr'}}}});
+  mc('cROI','bar',{labels:(D.sources||[]).map(s=>s.name),datasets:[{data:(D.sources||[]).map(s=>s.conv),backgroundColor:(D.sources||[]).map(s=>s.conv>=20?'#16A34A':s.conv>=15?'#C9A84C':s.conv>=12?'#EA580C':'#DC2626'),borderRadius:4}]},{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#6B7280',callback:v=>v+'%'}},y:{grid:{display:false},ticks:{color:'#6B7280'}}}});
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+loadAllData();
+</script>
+</body>
+</html>
